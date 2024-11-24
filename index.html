@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATA Tournament Bracket Generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>ATA Tournament Bracket Generator</h1>
+        
+        <div class="input-section">
+            <h2>Upload Tournament Data</h2>
+            <input type="file" id="csvFile" accept=".csv" />
+            <button id="generateBtn">Generate Bracket</button>
+            
+            <div class="tournament-info">
+                <input type="text" id="tournamentName" placeholder="Tournament Name">
+                <input type="date" id="tournamentDate">
+                <div class="division-info">
+                    <input type="text" id="divisionClass" readonly placeholder="Division/Class (Auto-filled from CSV)">
+                </div>
+            </div>
+        </div>
+        
+        <div class="bracket-container">
+            <div class="bracket-header">
+                <div class="sheet-number">
+                    <label>Sheet #:</label>
+                    <input type="number" id="sheetNumber" min="1">
+                </div>
+                <div class="team-count">
+                    <label>Number of Teams:</label>
+                    <span id="teamCount">0</span>
+                </div>
+                <div class="bye-count">
+                    <label>Number of Byes:</label>
+                    <span id="byeCount">0</span>
+                </div>
+            </div>
+            <div id="bracket"></div>
+        </div>
+        
+        <div class="winners-section">
+            <div class="winner-input">
+                <label>1st Place Winner:</label>
+                <input type="text" id="firstPlace" readonly>
+            </div>
+            <div class="winner-input">
+                <label>2nd Place Winner:</label>
+                <input type="text" id="secondPlace" readonly>
+            </div>
+            <div class="winner-input">
+                <label>3rd Place Winner:</label>
+                <input type="text" id="thirdPlace" readonly>
+            </div>
+        </div>
+        
+        <div class="points-section">
+            <h3>Champion Points Earned:</h3>
+            <div class="points-info">
+                <div>
+                    <h4>National Events:</h4>
+                    <p>1st = 10 | 2nd = 8 | 3rd = 5</p>
+                </div>
+                <div>
+                    <h4>Regional Events:</h4>
+                    <p>1st = 5 | 2nd = 3 | 3rd = 1</p>
+                </div>
+            </div>
+        </div>
+        
+        <button id="printBtn">Print Bracket</button>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
