@@ -201,7 +201,7 @@
             let pdfTemplate = null;
             
             async function loadPDFTemplate() {
-                const response = await fetch('Team Sparring Bracket.pdf');
+                const response = await fetch('ATAteamBracket.pdf');
                 const arrayBuffer = await response.arrayBuffer();
                 const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
                 return pdfDoc;
