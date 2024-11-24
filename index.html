@@ -12,16 +12,19 @@
         
         <div class="input-section">
             <h2>Upload Tournament Data</h2>
-            <input type="file" id="csvFile" accept=".csv" />
-            <button id="generateBtn">Generate Bracket</button>
+            <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" />
+            <div class="file-format-info">
+                <p>Supported formats: CSV, Excel (.xlsx, .xls)</p>
+            </div>
             
             <div class="tournament-info">
                 <input type="text" id="tournamentName" placeholder="Tournament Name">
                 <input type="date" id="tournamentDate">
                 <div class="division-info">
-                    <input type="text" id="divisionClass" readonly placeholder="Division/Class (Auto-filled from CSV)">
+                    <input type="text" id="divisionClass" readonly placeholder="Division/Class (Auto-filled)">
                 </div>
             </div>
+            <button id="generateBtn">Generate Bracket</button>
         </div>
         
         <div class="bracket-container">
@@ -42,38 +45,10 @@
             <div id="bracket"></div>
         </div>
         
-        <div class="winners-section">
-            <div class="winner-input">
-                <label>1st Place Winner:</label>
-                <input type="text" id="firstPlace" readonly>
-            </div>
-            <div class="winner-input">
-                <label>2nd Place Winner:</label>
-                <input type="text" id="secondPlace" readonly>
-            </div>
-            <div class="winner-input">
-                <label>3rd Place Winner:</label>
-                <input type="text" id="thirdPlace" readonly>
-            </div>
-        </div>
-        
-        <div class="points-section">
-            <h3>Champion Points Earned:</h3>
-            <div class="points-info">
-                <div>
-                    <h4>National Events:</h4>
-                    <p>1st = 10 | 2nd = 8 | 3rd = 5</p>
-                </div>
-                <div>
-                    <h4>Regional Events:</h4>
-                    <p>1st = 5 | 2nd = 3 | 3rd = 1</p>
-                </div>
-            </div>
-        </div>
-        
         <button id="printBtn">Print Bracket</button>
     </div>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
