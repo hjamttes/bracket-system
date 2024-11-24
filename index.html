@@ -4,7 +4,139 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATA Tournament Bracket Generator</title>
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .input-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .file-format-info {
+            margin: 10px 0;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .tournament-info {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        input[type="text"],
+        input[type="date"],
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        input[readonly] {
+            background-color: #f8f8f8;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: bold;
+            display: block;
+            margin: 20px auto 0;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .bracket-container {
+            margin: 40px 0;
+            overflow-x: auto;
+        }
+        .bracket-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        .bracket {
+            display: flex;
+            justify-content: space-between;
+        }
+        .round {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            margin: 0 20px;
+        }
+        .match {
+            display: flex;
+            flex-direction: column;
+            margin: 10px 0;
+            position: relative;
+        }
+        .match::after {
+            content: '';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            width: 20px;
+            height: 2px;
+            background-color: #ddd;
+        }
+        .team {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin: 2px 0;
+            background-color: white;
+            min-width: 150px;
+        }
+        .team.red {
+            border-left: 4px solid #ff0000;
+        }
+        .team.white {
+            border-left: 4px solid #000000;
+        }
+        @media print {
+            .input-section,
+            #printBtn {
+                display: none;
+            }
+            
+            .bracket-container {
+                margin: 0;
+            }
+            
+            .team {
+                border: 1px solid #000;
+            }
+            
+            .team.red {
+                border-left: 4px solid #ff0000;
+            }
+            
+            .team.white {
+                border-left: 4px solid #000000;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -45,10 +177,225 @@
             <div id="bracket"></div>
         </div>
         
-        <button id="printBtn">Print Bracket</button>
+        <button id="printBtn">Generate PDF</button>
     </div>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="script.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('csvFile');
+            const generateBtn = document.getElementById('generateBtn');
+            const printBtn = document.getElementById('printBtn');
+            const divisionClassInput = document.getElementById('divisionClass');
+            const teamCountSpan = document.getElementById('teamCount');
+            const byeCountSpan = document.getElementById('byeCount');
+            
+            let tournamentData = {
+                division: '',
+                teams: []
+            };
+
+            // Load the template PDF
+            let pdfTemplate = null;
+            
+            async function loadPDFTemplate() {
+                const response = await fetch('Team Sparring Bracket.pdf');
+                const arrayBuffer = await response.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                return pdfDoc;
+            }
+
+            // Load template when page loads
+            loadPDFTemplate().then(pdf => {
+                pdfTemplate = pdf;
+            }).catch(error => {
+                console.error('Error loading PDF template:', error);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                
+                if (fileExtension === 'csv') {
+                    handleCSV(file);
+                } else if (['xlsx', 'xls'].includes(fileExtension)) {
+                    handleExcel(file);
+                }
+            });
+
+            function handleCSV(file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const csvData = event.target.result;
+                    processFileData(csvData.split('\n').map(line => [line.trim()]));
+                };
+                reader.readAsText(file);
+            }
+
+            function handleExcel(file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    processFileData(jsonData);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function processFileData(data) {
+                // Filter out empty rows
+                data = data.filter(row => row.length > 0 && row[0]);
+                
+                // Try to find division/class information
+                tournamentData.division = findDivision(data);
+                
+                // Get team names (skip header rows)
+                tournamentData.teams = data
+                    .filter(row => {
+                        const cellValue = row[0].toString().toLowerCase();
+                        return !cellValue.includes('division') && 
+                               !cellValue.includes('class') && 
+                               !cellValue.includes('sparring') &&
+                               cellValue !== tournamentData.division.toLowerCase();
+                    })
+                    .map((row, index) => ({
+                        teamName: row[0],
+                        color: index % 2 === 0 ? 'red' : 'white'
+                    }));
+                
+                // Update UI
+                divisionClassInput.value = tournamentData.division;
+                teamCountSpan.textContent = tournamentData.teams.length;
+                
+                // Calculate and display byes
+                const bracketSize = calculateBracketSize(tournamentData.teams.length);
+                const byes = bracketSize - tournamentData.teams.length;
+                byeCountSpan.textContent = byes;
+            }
+
+            function findDivision(data) {
+                // Look for division information in first few rows
+                for (let i = 0; i < Math.min(3, data.length); i++) {
+                    const cellValue = data[i][0].toString().toLowerCase();
+                    if (cellValue.includes('combat') || 
+                        cellValue.includes('traditional') || 
+                        cellValue.includes('sparring') ||
+                        cellValue.includes('jv') || 
+                        cellValue.includes('varsity')) {
+                        return data[i][0];
+                    }
+                }
+                return 'Division Not Found';
+            }
+
+            async function fillPDFTemplate(teams, tournamentInfo) {
+                if (!pdfTemplate) {
+                    alert('PDF template not loaded');
+                    return;
+                }
+
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const [page] = await pdfDoc.copyPages(pdfTemplate, [0]);
+                pdfDoc.addPage(page);
+
+                const form = page.getForm();
+
+                // Fill tournament info
+                form.getTextField('Tournament').setText(tournamentInfo.name);
+                form.getTextField('Date').setText(tournamentInfo.date);
+                form.getTextField('Class').setText(tournamentData.division);
+                form.getTextField('Sheet').setText(document.getElementById('sheetNumber').value);
+
+                // Calculate bracket positions
+                const bracketSize = calculateBracketSize(teams.length);
+                const byes = bracketSize - teams.length;
+
+                // Fill in team names and colors
+                teams.forEach((team, index) => {
+                    const position = calculateTeamPosition(index, bracketSize);
+                    const fieldName = `Team${position}`;
+                    const colorFieldName = `Color${position}`;
+                    
+                    if (form.getTextField(fieldName)) {
+                        form.getTextField(fieldName).setText(team.teamName);
+                    }
+                    if (form.getTextField(colorFieldName)) {
+                        form.getTextField(colorFieldName).setText(team.color.toUpperCase());
+                    }
+                });
+
+                // Add bye slots
+                for (let i = teams.length; i < bracketSize; i++) {
+                    const position = calculateTeamPosition(i, bracketSize);
+                    const fieldName = `Team${position}`;
+                    if (form.getTextField(fieldName)) {
+                        form.getTextField(fieldName).setText('BYE');
+                    }
+                }
+
+                // Generate the filled PDF
+                const pdfBytes = await pdfDoc.save();
+                
+                // Create download link
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${tournamentInfo.name}_bracket.pdf`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+
+            function calculateBracketSize(numTeams) {
+                let size = 2;
+                while (size < numTeams) {
+                    size *= 2;
+                }
+                return size;
+            }
+
+            function calculateTeamPosition(index, bracketSize) {
+                // Standard tournament seeding for 16 team bracket
+                const positions = [1, 16, 9, 8, 5, 12, 13, 4, 3, 14, 11, 6, 7, 10, 15, 2];
+                return positions[index] || index + 1;
+            }
+
+            generateBtn.addEventListener('click', async () => {
+                if (tournamentData.teams.length === 0) {
+                    alert('Please upload file first');
+                    return;
+                }
+                
+                const tournamentInfo = {
+                    name: document.getElementById('tournamentName').value,
+                    date: document.getElementById('tournamentDate').value
+                };
+                
+                if (!tournamentInfo.name || !tournamentInfo.date) {
+                    alert('Please fill in tournament name and date');
+                    return;
+                }
+                
+                try {
+                    await fillPDFTemplate(tournamentData.teams, tournamentInfo);
+                } catch (error) {
+                    console.error('Error generating PDF:', error);
+                    alert('Error generating PDF. Please check console for details.');
+                }
+            });
+
+            printBtn.addEventListener('click', () => {
+                if (tournamentData.teams.length === 0) {
+                    alert('Please generate a bracket first');
+                    return;
+                }
+                window.print();
+            });
+        });
+    </script>
 </body>
 </html>
