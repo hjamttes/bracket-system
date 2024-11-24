@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const csvFile = document.getElementById('csvFile');
+    const fileInput = document.getElementById('csvFile');
     const generateBtn = document.getElementById('generateBtn');
     const printBtn = document.getElementById('printBtn');
     const bracketDiv = document.getElementById('bracket');
@@ -12,22 +12,82 @@ document.addEventListener('DOMContentLoaded', () => {
         teams: []
     };
     
-    csvFile.addEventListener('change', (e) => {
+    fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        const reader = new FileReader();
+        const fileExtension = file.name.split('.').pop().toLowerCase();
         
+        if (fileExtension === 'csv') {
+            handleCSV(file);
+        } else if (['xlsx', 'xls'].includes(fileExtension)) {
+            handleExcel(file);
+        }
+    });
+    
+    function handleCSV(file) {
+        const reader = new FileReader();
         reader.onload = (event) => {
             const csvData = event.target.result;
-            tournamentData = parseCSV(csvData);
-            divisionClassInput.value = tournamentData.division;
+            processFileData(csvData.split('\n').map(line => [line.trim()]));
         };
-        
         reader.readAsText(file);
-    });
+    }
+    
+    function handleExcel(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const data = new Uint8Array(event.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            processFileData(jsonData);
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    
+    function processFileData(data) {
+        // Filter out empty rows
+        data = data.filter(row => row.length > 0 && row[0]);
+        
+        // Try to find division/class information
+        tournamentData.division = findDivision(data);
+        
+        // Get team names (skip header rows)
+        tournamentData.teams = data
+            .filter(row => {
+                const cellValue = row[0].toString().toLowerCase();
+                return !cellValue.includes('division') && 
+                       !cellValue.includes('class') && 
+                       !cellValue.includes('sparring') &&
+                       cellValue !== tournamentData.division.toLowerCase();
+            })
+            .map((row, index) => ({
+                teamName: row[0],
+                color: index % 2 === 0 ? 'red' : 'white'
+            }));
+        
+        // Update UI
+        divisionClassInput.value = tournamentData.division;
+        teamCountSpan.textContent = tournamentData.teams.length;
+    }
+    
+    function findDivision(data) {
+        // Look for division information in first few rows
+        for (let i = 0; i < Math.min(3, data.length); i++) {
+            const cellValue = data[i][0].toString().toLowerCase();
+            if (cellValue.includes('combat') || 
+                cellValue.includes('traditional') || 
+                cellValue.includes('sparring') ||
+                cellValue.includes('jv') || 
+                cellValue.includes('varsity')) {
+                return data[i][0];
+            }
+        }
+        return 'Division Not Found';
+    }
     
     generateBtn.addEventListener('click', () => {
         if (tournamentData.teams.length === 0) {
-            alert('Please upload CSV file first');
+            alert('Please upload file first');
             return;
         }
         
@@ -42,41 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
         generateBracket(tournamentData.teams);
     });
     
-    printBtn.addEventListener('click', () => {
-        window.print();
-    });
-    
-    function parseCSV(csvData) {
-        const lines = csvData.split('\n');
-        const data = {
-            division: '',
-            teams: []
-        };
-        
-        // First line contains the division/class
-        if (lines.length > 0) {
-            data.division = lines[0].trim();
-        }
-        
-        // Parse team data starting from second line
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line) {
-                const teamInfo = line.split(',');
-                if (teamInfo.length >= 1) {
-                    data.teams.push({
-                        teamName: teamInfo[0].trim(),
-                        // If color is not specified, alternate between red and white
-                        color: teamInfo[1] ? teamInfo[1].trim().toLowerCase() : 
-                               (data.teams.length % 2 === 0 ? 'red' : 'white')
-                    });
-                }
-            }
-        }
-        
-        return data;
-    }
-    
     function generateBracket(teams) {
         // Calculate number of teams and byes
         const totalTeams = teams.length;
@@ -86,14 +111,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const byes = bracketSize - totalTeams;
-        
-        // Update display counters
-        teamCountSpan.textContent = totalTeams;
         byeCountSpan.textContent = byes;
         
-        // Assign byes and create bracket structure
+        // Create bracket structure
         const bracket = [];
-        let byeCounter = 0;
         
         for (let i = 0; i < bracketSize / 2; i++) {
             const match = {
@@ -105,13 +126,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 match.team1 = teams[i];
             } else {
                 match.team1 = { teamName: 'BYE', color: 'none' };
-                byeCounter++;
             }
             
             const opponent = bracketSize - 1 - i;
             if (opponent >= totalTeams) {
                 match.team2 = { teamName: 'BYE', color: 'none' };
-                byeCounter++;
             } else {
                 match.team2 = teams[opponent];
             }
@@ -119,11 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bracket.push(match);
         }
         
-        // Render bracket
         renderBracket(bracket);
-        
-        // Enable match result tracking
-        enableMatchTracking();
     }
     
     function renderBracket(bracket) {
@@ -141,17 +156,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 matchDiv.className = 'match';
                 
                 if (round === 0) {
-                    // First round - use actual teams
-                    const team1Div = createTeamDiv(bracket[match].team1, `${round}-${match}-1`);
-                    const team2Div = createTeamDiv(bracket[match].team2, `${round}-${match}-2`);
-                    
+                    const team1Div = createTeamDiv(bracket[match].team1);
+                    const team2Div = createTeamDiv(bracket[match].team2);
                     matchDiv.appendChild(team1Div);
                     matchDiv.appendChild(team2Div);
                 } else {
-                    // Subsequent rounds - empty slots
-                    const slot1 = createTeamDiv({ teamName: '', color: 'none' }, `${round}-${match}-1`);
-                    const slot2 = createTeamDiv({ teamName: '', color: 'none' }, `${round}-${match}-2`);
-                    
+                    const slot1 = createTeamDiv({ teamName: '', color: 'none' });
+                    const slot2 = createTeamDiv({ teamName: '', color: 'none' });
                     matchDiv.appendChild(slot1);
                     matchDiv.appendChild(slot2);
                 }
@@ -164,31 +175,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    function createTeamDiv(team, id) {
+    function createTeamDiv(team) {
         const teamDiv = document.createElement('div');
         teamDiv.className = `team ${team.color}`;
         teamDiv.textContent = team.teamName;
-        teamDiv.dataset.teamId = id;
-        teamDiv.draggable = true;
         return teamDiv;
     }
     
-    function enableMatchTracking() {
-        const teams = document.querySelectorAll('.team');
-        
-        teams.forEach(team => {
-            team.addEventListener('click', function() {
-                if (this.textContent && this.textContent !== 'BYE') {
-                    const nextRound = this.closest('.round').nextElementSibling;
-                    if (nextRound) {
-                        const nextSlot = nextRound.querySelector('.team:empty');
-                        if (nextSlot) {
-                            nextSlot.textContent = this.textContent;
-                            nextSlot.className = `team ${this.classList.contains('red') ? 'red' : 'white'}`;
-                        }
-                    }
-                }
-            });
-        });
-    }
+    printBtn.addEventListener('click', () => {
+        window.print();
+    });
 });
